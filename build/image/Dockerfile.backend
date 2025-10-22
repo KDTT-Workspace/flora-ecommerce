@@ -1,0 +1,23 @@
+ARG RUNTIME_IMAGE
+FROM ${RUNTIME_IMAGE} as builder
+
+WORKDIR /app
+
+COPY --chown=appuser:appuser pom.xml .
+RUN mvn dependency:go-offline -B
+
+COPY --chown=appuser:appuser src ./src
+RUN mvn clean package -DskipTests
+
+FROM openjdk:21-jdk-slim as runtime
+
+ENV TZ="Asia/Ho_Chi_Minh"
+WORKDIR /app
+
+COPY --from=builder /app/target/*.jar app.jar
+
+RUN useradd -m appuser
+USER appuser
+
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]

@@ -1,0 +1,10 @@
+# Frontend Base Image for React
+FROM node:20-slim
+
+ENV TZ="Asia/Ho_Chi_Minh"
+
+# Install additional tools
+RUN apt-get update && \
+    apt-get install -y telnet ngrep htop net-tools openssl curl wget iputils-ping && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*

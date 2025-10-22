@@ -6,7 +6,6 @@ dist/
 .vscode/
 .DS_Store
 coverage/
-build/
 .idea/
 *.log
 *.tmp
