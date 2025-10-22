@@ -1,0 +1,26 @@
+.github/instructions/
+
+node_modules/
+dist/
+.env
+.vscode/
+.DS_Store
+coverage/
+build/
+.idea/
+*.log
+*.tmp
+*.bak
+*.swp
+*.old
+
+# java
+*.class
+*.jar
+*.war
+*.ear
+# GO
+bin/
+*.exe
+*.out
+*.test
