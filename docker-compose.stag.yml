@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Backend Service - Single instance for development
+  backend:
+    image: luongnguyenminhan/flora:backend-${BACKEND_TAG}
+    container_name: flora-backend-stag
+    expose:
+      - "8080"
+    environment:
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=${SPRING_DATASOURCE_DRIVER_CLASS_NAME}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - SPRING_JPA_DATABASE_PLATFORM=${SPRING_JPA_DATABASE_PLATFORM}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=${SPRING_JPA_HIBERNATE_DDL_AUTO}
+      - SPRING_JPA_SHOW_SQL=${SPRING_JPA_SHOW_SQL}
+      - SPRING_JPA_PROPERTIES_HIBERNATE_BOOT_ALLOW_JDBC_METADATA_ACCESS=${SPRING_JPA_PROPERTIES_HIBERNATE_BOOT_ALLOW_JDBC_METADATA_ACCESS}
+      - SPRING_JPA_PROPERTIES_HIBERNATE_JDBC_BATCH_SIZE=${SPRING_JPA_PROPERTIES_HIBERNATE_JDBC_BATCH_SIZE}
+      - SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_INSERTS=${SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_INSERTS}
+      - SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_UPDATES=${SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_UPDATES}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE}
+      - SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT}
+      - SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT=${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT}
+      - SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME}
+    depends_on:
+      - mysql
+    networks:
+      - flora-network
+    restart: unless-stopped
+
+  # Frontend Service - Single instance for development
+  frontend:
+    image: luongnguyenminhan/flora:frontend-${FRONTEND_TAG}
+    container_name: flora-frontend-stag
+    expose:
+      - "3000"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+    depends_on:
+      - backend
+    networks:
+      - flora-network
+    restart: unless-stopped
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: flora-nginx-stag
+    ports:
+      - "2226:80"
+      - "2227:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - flora-network
+    restart: unless-stopped
+
+networks:
+  flora-network:
+    driver: bridge
