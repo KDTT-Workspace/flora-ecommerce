@@ -1,5 +1,5 @@
-ARG RUNTIME_IMAGE
-FROM ${RUNTIME_IMAGE} as builder
+# Use a specific Maven image for build stage (hard-coded)
+FROM maven:3-eclipse-temurin-21 as builder
 
 WORKDIR /app
 

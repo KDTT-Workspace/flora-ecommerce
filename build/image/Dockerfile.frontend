@@ -1,7 +1,6 @@
 # Frontend Dockerfile for React - Build Only
-ARG RUNTIME_IMAGE
-
-FROM ${RUNTIME_IMAGE} as build
+# Build stage: use a specific Node image (hard-coded)
+FROM node:20-slim as build
 
 # Set working directory
 WORKDIR /app
