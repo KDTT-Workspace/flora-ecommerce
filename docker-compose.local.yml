@@ -25,8 +25,6 @@ services:
     build:
       context: ./backend
       dockerfile: ../build/image/Dockerfile.backend
-      args:
-        RUNTIME_IMAGE: maven:3-eclipse-temurin-21
     image: flora-backend:latest
     container_name: flora-backend
     ports:
@@ -56,8 +54,6 @@ services:
     build:
       context: ./frontend
       dockerfile: ../build/image/Dockerfile.frontend
-      args:
-        RUNTIME_IMAGE: node:20-slim
     image: flora-frontend:latest
     container_name: flora-frontend
     ports:
