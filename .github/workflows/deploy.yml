@@ -1,0 +1,205 @@
+name: Deploy Flora E-commerce
+
+on:
+  push:
+    branches: [main, production]
+    tags:
+      - stable/*
+
+jobs:
+  # Build and push images on main branch (DEV)
+  build-and-push-dev:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push backend image (DEV)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./build/image/Dockerfile.backend
+        push: true
+        tags: luongnguyenminhan/flora:backend-dev-${{ github.run_number }},luongnguyenminhan/flora:backend-dev-latest
+
+    - name: Build and push frontend image (DEV)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./build/image/Dockerfile.frontend
+        push: true
+        tags: luongnguyenminhan/flora:frontend-dev-${{ github.run_number }},luongnguyenminhan/flora:frontend-dev-latest
+
+  # Build and push images for staging when stable tag is created
+  build-and-push-staging:
+    if: startsWith(github.ref, 'refs/tags/stable/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Extract version from tag
+      run: echo "VERSION=${GITHUB_REF#refs/tags/stable/}" >> $GITHUB_ENV
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push backend image (STAGING)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./build/image/Dockerfile.backend
+        push: true
+        tags: luongnguyenminhan/flora:backend-staging-${{ env.VERSION }},luongnguyenminhan/flora:backend-staging-latest
+
+    - name: Build and push frontend image (STAGING)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./build/image/Dockerfile.frontend
+        push: true
+        tags: luongnguyenminhan/flora:frontend-staging-${{ env.VERSION }},luongnguyenminhan/flora:frontend-staging-latest
+
+  # Deploy to staging when stable tag is created
+  # NOTE: This job runs on your self-hosted runner. Ensure the runner is registered
+  # with labels: self-hosted, linux, x64 (see repository Settings -> Actions -> Runners).
+  deploy-staging:
+    if: startsWith(github.ref, 'refs/tags/stable/') || startsWith(github.ref, 'refs/heads/stable/')
+    needs: build-and-push-staging
+    runs-on: [self-hosted, linux, x64]
+    environment: staging
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Extract version from tag
+      run: echo "VERSION=${GITHUB_REF#refs/tags/stable/}" >> $GITHUB_ENV
+
+    - name: Decode and create .env file from secret
+      run: |
+        echo "${{ secrets.ENV_FILE }}" | base64 -d > .env
+        chmod 600 .env
+        echo "Displaying .env contents (do not share this output publicly)"
+        echo "=== .env start ==="
+        cat .env
+        echo "=== .env end ==="
+
+    - name: Setup Docker
+      run: |
+        apt-get update || true
+        apt-get install -y docker-compose curl || true
+
+    - name: Make deploy script executable
+      run: chmod +x deploy.sh
+
+    - name: Deploy to staging
+      run: |
+        echo "🚀 Deploying version ${{ env.VERSION }} to STAGING"
+        echo "Tag: ${{ github.ref }}"
+        echo "SHA: ${{ github.sha }}"
+        ./deploy.sh staging ${{ env.VERSION }}
+
+  # Build and push images for production when production branch is pushed
+  build-and-push-production:
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push backend image (PRODUCTION)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./build/image/Dockerfile.backend
+        push: true
+        tags: luongnguyenminhan/flora:backend-prod-${{ github.run_number }},luongnguyenminhan/flora:backend-prod-latest
+
+    - name: Build and push frontend image (PRODUCTION)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./build/image/Dockerfile.frontend
+        push: true
+        tags: luongnguyenminhan/flora:frontend-prod-${{ github.run_number }},luongnguyenminhan/flora:frontend-prod-latest
+
+  # Deploy to production when production branch is pushed
+  # NOTE: This job runs on your self-hosted runner. Ensure the runner is registered
+  # with labels: self-hosted, linux, x64.
+  deploy-production:
+    if: github.ref == 'refs/heads/production'
+    needs: build-and-push-production
+    runs-on: [self-hosted, linux, x64]
+    environment: production
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Decode and create .env file from secret
+      run: |
+        echo "${{ secrets.ENV_FILE }}" | base64 -d > .env
+        chmod 600 .env
+        echo "Displaying .env contents (do not share this output publicly)"
+        echo "=== .env start ==="
+        cat .env
+        echo "=== .env end ==="
+
+    - name: Setup Docker
+      run: |
+        apt-get update || true
+        apt-get install -y docker-compose curl || true
+
+    - name: Make deploy script executable
+      run: chmod +x deploy.sh
+
+    - name: Deploy to production
+      run: |
+        echo "🎯 Deploying to PRODUCTION"
+        echo "Branch: ${{ github.ref }}"
+        echo "SHA: ${{ github.sha }}"
+        ./deploy.sh production ${{ github.run_number }}
+
+  # Deploy to dev when main branch is pushed (after build)
+  # NOTE: This job runs on your self-hosted runner so it deploys directly to your VPS.
+  deploy-dev:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-push-dev
+    runs-on: [self-hosted, linux, x64]
+    environment: dev
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Decode and create .env file from secret
+      run: |
+        echo "${{ secrets.ENV_FILE }}" | base64 -d > .env
+        chmod 600 .env
+        echo "Displaying .env contents (do not share this output publicly)"
+        echo "=== .env start ==="
+        cat .env
+        echo "=== .env end ==="
+
+    - name: Setup Docker
+      run: |
+        apt-get update || true
+        apt-get install -y docker-compose curl || true
+
+    - name: Make deploy script executable
+      run: chmod +x deploy.sh
+
+    - name: Deploy to dev
+      run: |
+        echo "🧪 Deploying to DEV environment"
+        echo "Branch: ${{ github.ref }}"
+        echo "SHA: ${{ github.sha }}"
+        ./deploy.sh dev ${{ github.run_number }}
